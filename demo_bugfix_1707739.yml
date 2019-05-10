@@ -1,0 +1,49 @@
+---
+
+- name: create OVN entities
+  hosts: localhost
+
+  vars:
+    - cloud_name: ovirt
+
+  tasks:
+    - name: read ovn_central IP address
+      include_vars:
+        file: clouds.yml
+        name: clouds
+
+    - name: create a logical network
+      os_network:
+        cloud: "{{ cloud_name }}"
+        state: present
+        name: demo_net
+      register: demo_net
+
+    - name: attach a subnet to the logical network
+      os_subnet:
+        cloud: "{{ cloud_name }}"
+        state: present
+        network_name: "{{ demo_net.id }}"
+        name: subnet1
+        ip_version: 6
+        cidr: de:abcd::1/64
+        enable_dhcp: yes
+      register: the_subnet
+
+    - name: print the created subnet
+      debug: var=the_subnet
+
+    - name: update the subnet
+      uri:
+        url: "{{ clouds.clouds.ovirt.auth.auth_url | regex_replace('35357', '9696') }}/subnets/{{ the_subnet.id }}"
+        method: PUT
+        body_format: json
+        body:
+          subnet:
+            ipv6_address_mode: dhcpv6_stateless
+        status_code: 200
+      register: the_updated_subnet
+
+    - name: print the updated subnet
+      debug: var=the_updated_subnet
+
